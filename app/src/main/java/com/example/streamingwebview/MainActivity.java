@@ -17,6 +17,7 @@ import java.io.PipedOutputStream;
 import java.nio.charset.StandardCharsets;
 
 public class MainActivity extends AppCompatActivity {
+    private static final String TAG = "MainActivity";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -27,6 +28,12 @@ public class MainActivity extends AppCompatActivity {
         WebView webView = new WebView(this);
         webView.getSettings().setJavaScriptEnabled(true);
 
+        StringBuilder chunkPrefixBuilder = new StringBuilder();
+        for (int i = 0; i < 1024; i++) {
+            chunkPrefixBuilder.append(" ");
+        }
+        final String chunkPrefix = chunkPrefixBuilder.toString();
+
         webView.setWebViewClient(new WebViewClient() {
             @Nullable
             @Override
@@ -35,32 +42,31 @@ public class MainActivity extends AppCompatActivity {
                     Uri uri = request.getUrl();
                     if (uri != null) {
                         String url = uri.toString();
-                        Log.e("MYtAG", url);
-                        if ("https://www.baidu.com/".equals(url)) {
-                            Log.e("myTag", "url matched");
-
+                        Log.e(TAG, url);
+                        if ("https://www.baidu.com/".equals(url) && request.isForMainFrame()) {
+                            Log.e(TAG, "url matched");
                             PipedInputStream pipedInputStream = new PipedInputStream() {
                                 @Override
                                 public byte[] readAllBytes() throws IOException {
-                                    Log.e("myTag", "readAllBytes()");
+                                    Log.e(TAG, "readAllBytes()");
                                     return super.readAllBytes();
                                 }
 
                                 @Override
                                 public int read(byte[] b) throws IOException {
-                                    Log.e("myTag", "read(byte[] b)");
+                                    Log.e(TAG, "read(byte[] b)");
                                     return super.read(b);
                                 }
 
                                 @Override
                                 public synchronized int read() throws IOException {
-                                    Log.e("myTag", "read");
+                                    Log.e(TAG, "read");
                                     return super.read();
                                 }
 
                                 @Override
                                 public synchronized int read(byte[] b, int off, int len) throws IOException {
-                                    Log.e("myTag", "read(byte[] b, int off, int len)");
+                                    Log.e(TAG, "read(byte[] b, int off, int len)");
                                     return super.read(b, off, len);
                                 }
 
@@ -91,7 +97,7 @@ public class MainActivity extends AppCompatActivity {
                                             "        cnt = cnt + 1;\n" +
                                             "    }, 1000);\n" +
                                             "</script>\n" +
-                                            "<body>";
+                                            "<body> <p> This is the static part. </p>";
                                     String afterBody = "</body>\n" +
                                             "</html>";
                                     try {
@@ -104,17 +110,19 @@ public class MainActivity extends AppCompatActivity {
 //                                    } catch (IOException e) {
 //                                        e.printStackTrace();
 //                                    }
-                                    while (cnt < 5) {
-                                        Log.e("myTag", "cnt = " + cnt);
+                                    while (cnt < 10) {
+                                        Log.e(TAG, "cnt = " + cnt);
                                         try {
                                             Thread.sleep(1000);
                                         } catch (InterruptedException e) {
                                             e.printStackTrace();
                                         }
+
+                                        String chunk = (chunkPrefix + "<p> current： " + cnt + "</p>");
                                         try {
-                                            pipedOutputStream.write(("<p> current： " + cnt + "</p>").getBytes());
+                                            pipedOutputStream.write(chunk.getBytes());
                                         } catch (IOException e) {
-                                            e.printStackTrace();
+                                            throw new RuntimeException(e);
                                         }
 
                                         cnt++;
@@ -132,7 +140,7 @@ public class MainActivity extends AppCompatActivity {
                                         e.printStackTrace();
                                     }
                                 }
-                            }.run();
+                            }.start();
 
                             return new WebResourceResponse("text/html", StandardCharsets.UTF_8.name(), pipedInputStream);
                         }
